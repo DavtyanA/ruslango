@@ -1,47 +1,49 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+
 	"github.com/bwmarrin/discordgo"
 )
 
 var bucket string
-var sess *session.Session
+var s3Client *s3.Client
 var region = "us-east-2"
 
 func init() {
 	bucket = "ruslanbot"
 
-	// Initialize a session in us-west-2 that the SDK will use to load
-	// credentials from the shared credentials file ~/.aws/credentials.
-	sess, _ = session.NewSession(&aws.Config{
-		Region: aws.String(region)},
-	)
+	cfg, err := config.LoadDefaultConfig(context.Background())
+	if err != nil {
+		fmt.Println("error loading AWS config", err)
+		return
+	}
+
+	s3Client = s3.NewFromConfig(cfg)
 
 }
 
-//Note that the item name is converted to lowercase in here
+// Note that the item name is converted to lowercase in here
 func downloadFromS3Bucket(item string) (string, error) {
-	//downloader for s3 items
-	downloader := s3manager.NewDownloader(sess)
-	//for some reason when you create a file with full item name/path it gives you an error
+	downloader := manager.NewDownloader(s3Client)
 	ss := strings.Split(item, "/")
-	fileName := ss[len(ss)-1] //to get just the file name without folders
+	fileName := ss[len(ss)-1]
 	file, err := os.Create("tmp/" + fileName)
 	if err != nil {
 		fmt.Println("error creating a file", fileName, err)
-		return file.Name(), err
+		return "", err
 	}
 	defer file.Close()
-	numBytes, err := downloader.Download(file,
+	numBytes, err := downloader.Download(context.TODO(), file,
 		&s3.GetObjectInput{
 			Bucket: aws.String(bucket),
 			Key:    aws.String(strings.ToLower(item)),
@@ -49,27 +51,20 @@ func downloadFromS3Bucket(item string) (string, error) {
 	if err != nil {
 		fmt.Println("error downloading the file", item, err)
 		return file.Name(), err
-	} else {
-		fmt.Println("Downloaded", file.Name(), numBytes, "bytes")
-		return file.Name(), err
 	}
+	fmt.Println("Downloaded", file.Name(), numBytes, "bytes")
+	return file.Name(), nil
 }
 
 func downloadFromS3BucketFolder(folder string) (string, error) {
-
-	//lister (?) to list items in a bucket
-	svc := s3.New(sess)
-	resp, err := svc.ListObjectsV2(&s3.ListObjectsV2Input{
+	resp, err := s3Client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucket),
-		//because when I created the bucket I put the files into subfolders
 		Prefix: aws.String(strings.ToLower(folder)),
 	})
-
 	if err != nil {
 		return "Could not get bucket, pls contact Oleg Ermolaev", err
 	}
 
-	//get a random item from the list of items in the bucket
 	items := resp.Contents
 	item := *GetRandomItem(items).Key
 	return downloadFromS3Bucket(item)
