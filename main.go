@@ -44,7 +44,7 @@ func main() {
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 
-	anekTimer(sc, dg)
+	// anekTimer(sc, dg)
 
 	// Cleanly close down the Discord session.
 	dg.Close()
@@ -70,4 +70,3 @@ func anekTimer(done <-chan os.Signal, dg *discordgo.Session) {
 		}
 	}
 }
-
