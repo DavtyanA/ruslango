@@ -15,7 +15,6 @@ import (
 func main() {
 
 	token := os.Getenv("RUSLAN_BOT_DISCORD_TOKEN")
-
 	// Create a new Discord session using the provided bot token.
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
@@ -45,7 +44,7 @@ func main() {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 
 	// anekTimer(sc, dg)
-
+	<-sc //anek is dead...
 	// Cleanly close down the Discord session.
 	dg.Close()
 }
