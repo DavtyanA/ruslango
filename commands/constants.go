@@ -35,20 +35,13 @@ const (
 	хьай дог сун схьа дела ахьам со галл ваьхкха
 	Мадина Мадина ахьам со вина
 	хьай дог сун схьа дела ахьам со галл ваьхкха`
-	Minesweeper = `||:stop_button:||||:stop_button:||||:stop_button:||||:stop_button:||||:stop_button:||||:stop_button:||||:one:||||:boom:||||:one:||
-	||:stop_button:||||:stop_button:||||:stop_button:||||:stop_button:||||:stop_button:||||:stop_button:||||:two:||||:three:||||:three:||
-	||:stop_button:||||:stop_button:||||:stop_button:||||:stop_button:||||:one:||||:one:||||:two:||||:boom:||||:boom:||
-	||:stop_button:||||:stop_button:||||:stop_button:||||:stop_button:||||:one:||||:boom:||||:two:||||:two:||||:two:||
-	||:one:||||:one:||||:one:||||:stop_button:||||:one:||||:one:||||:one:||||:stop_button:||||:stop_button:||
-	||:one:||||:boom:||||:two:||||:one:||||:one:||||:stop_button:||||:stop_button:||||:one:||||:one:||
-	||:one:||||:one:||||:two:||||:boom:||||:one:||||:stop_button:||||:one:||||:two:||||:boom:||
-	||:stop_button:||||:stop_button:||||:one:||||:two:||||:two:||||:one:||||:two:||||:boom:||||:three:||
-	||:stop_button:||||:stop_button:||||:stop_button:||||:one:||||:boom:||||:one:||||:two:||||:boom:||||:two:||`
 
-	Delete_Usage   = "Я не знаю хотел ты удалить сообщения или нет, но если хотел, нужно написать сколько. Например 'Удали 5'"
-	Delete_Success = "Мусор вынесен!"
-	Delete_FuckYou = "Мусор уже вынесли, пиздуй давай"
-	Server_Invite  = "https://discord.gg/UvEZHak"
+	Delete_Usage    = "Я не знаю хотел ты удалить сообщения или нет, но если хотел, нужно написать сколько. Например 'Удали 5'"
+	Delete_Success  = "Мусор вынесен!"
+	Delete_FuckYou  = "Мусор уже вынесли, пиздуй давай"
+	Delete_Failed   = "Не получилось удалить( Может, там сообщения старше двух недель, такие дискорд удалять не даёт"
+	Something_Broke = "ойой чета паламалась( Напиши Ендерлолу он там посмотрит че поломалось"
+	Server_Invite   = "https://discord.gg/UvEZHak"
 )
 
 // IDs

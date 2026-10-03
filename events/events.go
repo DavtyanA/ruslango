@@ -2,7 +2,9 @@ package events
 
 import (
 	"RUSLANGO/commands"
+	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -104,9 +106,10 @@ func OnMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 		s.ChannelMessageSend(channel, response)
 
 	case "справедливо":
-		commands.SendFileFromS3(s, channel, commands.Pictures_Folder_Other+"orehus-sticker.png")
-		chann, _ := s.Channel(channel) //idk what name to give
-		s.MessageReactionAdd(channel, chann.LastMessageID, ":orehus:400349897578250255")
+		sticker := commands.SendFileFromS3(s, channel, commands.Pictures_Folder_Other+"orehus-sticker.png")
+		if sticker != nil {
+			s.MessageReactionAdd(channel, sticker.ID, ":orehus:400349897578250255")
+		}
 
 	case "кто", "кто?":
 		s.ChannelMessageSend(channel, "Дарцаев Исмаил Умарпашаевич 11 микрорайон космонавтов 54 приезжайте я чеченец таких пидорасов я буду разъебывать, и вас я буду разъебывать")
@@ -231,7 +234,7 @@ func OnMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 	switch {
 	case commands.StringContainsArray(message, []string{"бебр", "bebr"}):
 		commands.SendRandomFileFromFolder(s, channel, "bebra")
-	case commands.StringContainsArray(message, []string{"бан", "ban"}):
+	case commands.StringContainsWordArray(message, []string{"бан", "ban"}):
 		commands.SendRandomFileFromFolder(s, channel, "ban")
 	case commands.StringContainsArray(message, []string{"пиздец", "капец", "бля...", "жаль", "грустно", "хуево", "хуёво", "мде", "press f"}): //need to remember the F above
 		commands.SendRandomFileFromFolder(s, channel, "F")
@@ -239,7 +242,8 @@ func OnMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 		commands.SendRandomFileFromFolder(s, channel, "cock")
 	case commands.StringContainsArray(message, []string{"loss", "потеря"}):
 		commands.SendRandomFileFromFolder(s, channel, "loss")
-	case commands.StringContainsArray(message, []string{"амогус", "амонг", "amog", "а мог", "сус", "sus", "among us"}):
+	case commands.StringContainsArray(message, []string{"амогус", "амонг", "amog", "а мог", "among us"}),
+		commands.StringContainsWordArray(message, []string{"сус", "sus"}):
 		commands.SendRandomFileFromFolder(s, channel, "amogus")
 	case commands.StringStartsWithArray(message, []string{"споки", "спокойной ночи", "сладких снов"}):
 		commands.SendFileFromS3(s, channel, commands.Pictures_Folder_Other+"isleep.gif")
@@ -279,12 +283,22 @@ func OnMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
-// When Ruslan connects to server, greet everyone. However, for some reason,
-// heroku does it too often, so this also has logic to prevent spamming.
+var greetOnce sync.Once
+
+// When Ruslan connects to server, greet everyone. Connect fires again every time
+// Discord asks the bot to reconnect (that's what was happening on heroku too),
+// so only greet once per start, and not if the greeting is already the last message.
 func OnBotReady(s *discordgo.Session, m *discordgo.Connect) {
-	channel, _ := s.Channel(commands.Botchat_ID)
-	last_message, _ := s.ChannelMessage(channel.ID, channel.LastMessageID)
-	if last_message.Content != commands.Bot_Greeting {
+	greetOnce.Do(func() {
+		channel, err := s.Channel(commands.Botchat_ID)
+		if err != nil {
+			fmt.Println("error getting the bot chat", err)
+			return
+		}
+		last_message, err := s.ChannelMessage(channel.ID, channel.LastMessageID)
+		if err == nil && last_message.Content == commands.Bot_Greeting {
+			return
+		}
 		s.ChannelMessageSend(commands.Botchat_ID, commands.Bot_Greeting)
-	}
+	})
 }

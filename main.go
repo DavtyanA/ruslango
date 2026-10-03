@@ -1,13 +1,12 @@
 package main
 
 import (
-	"RUSLANGO/commands"
 	"RUSLANGO/events"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -16,26 +15,27 @@ func main() {
 
 	token := os.Getenv("RUSLAN_BOT_DISCORD_TOKEN")
 	// Create a new Discord session using the provided bot token.
+	// log.Fatal exits with an error code, so systemd knows to restart the bot
+	// (a plain return exits "successfully", and systemd leaves it stopped)
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
-		fmt.Println("error creating Discord session,", err)
-		return
+		log.Fatal("error creating Discord session, ", err)
 	}
 
-	// Register the messageCreate func as a callback for MessageCreate events.
-	dg.AddHandler(events.OnMessage)
-	dg.AddHandler(events.OnServerJoin)
-	dg.AddHandler(events.OnServerLeave)
-	dg.AddHandler(events.OnBotReady)
+	// Register the event handlers. safe() makes sure one broken message can't crash the whole bot.
+	dg.AddHandler(safe(events.OnMessage))
+	dg.AddHandler(safe(events.OnServerJoin))
+	dg.AddHandler(safe(events.OnServerLeave))
+	dg.AddHandler(safe(events.OnBotReady))
 
-	// Make sure to include the intents in the code, because doing this in the developers portal doesn't work
+	// Privileged intents (like server members) need both: the toggle in the developer portal
+	// only allows the bot to use them, and this line actually asks Discord for them
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuildMembers
 
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
 	if err != nil {
-		fmt.Println("error opening connection,", err)
-		return
+		log.Fatal("error opening connection, ", err)
 	}
 
 	// Wait here until CTRL-C or other term signal is received.
@@ -43,29 +43,20 @@ func main() {
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 
-	// anekTimer(sc, dg)
 	<-sc //anek is dead...
 	// Cleanly close down the Discord session.
 	dg.Close()
 }
 
-// In order for program to be killed with the signal input, we need this function
-func anekTimer(done <-chan os.Signal, dg *discordgo.Session) {
-
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-done:
-			return
-		case <-ticker.C:
-			if commands.CheckTimeForAnecdote() {
-				anecdote := commands.GetRandomAnecdote()
-				if anecdote != "32" {
-					dg.ChannelMessageSend(commands.General_Chat_ID, anecdote+"\n ДАННЫЙ АНЕКДОТ ПРОСПОНСИРОВАН ОЛЕГОМ ЕРМОЛАЕВЫМ")
-				}
+// discordgo runs every handler on its own and doesn't catch panics, so without this
+// a single panic (like a bad "roll") takes down the whole bot. This logs it instead.
+func safe[T any](handler func(*discordgo.Session, T)) func(*discordgo.Session, T) {
+	return func(s *discordgo.Session, event T) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Println("handler panic:", r)
 			}
-		}
+		}()
+		handler(s, event)
 	}
 }

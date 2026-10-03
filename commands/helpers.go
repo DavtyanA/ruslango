@@ -6,16 +6,15 @@ import (
 	"math/rand"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/bwmarrin/discordgo"
 )
 
 // Get a random item from an array, works with dynamic types since Go 1.18! Zaebumba!
-func GetRandomItem[T interface{}](inputarray []T) T {
-	rand.Seed(time.Now().UnixNano())
-	//not sure if I need (len - 1), examples don't do that
-	randomItem := inputarray[rand.Intn(len(inputarray))]
-	return randomItem
+// (no need for len - 1: rand.Intn(n) already returns a number from 0 to n-1)
+func GetRandomItem[T any](inputarray []T) T {
+	return inputarray[rand.Intn(len(inputarray))]
 }
 
 // String contains to lower case
@@ -48,6 +47,26 @@ func StringContainsArray(S string, subs []string) bool {
 	return false
 }
 
+// Like StringContainsArray, but only matches whole words, so "бан" doesn't fire on "банк" or "кабан".
+// Go's regexp \b only knows English letters, so this compares the words themselves instead
+func StringContainsWordArray(S string, words []string) bool {
+	text := " " + onlyWords(S) + " "
+	for _, w := range words {
+		if strings.Contains(text, " "+onlyWords(w)+" ") {
+			return true
+		}
+	}
+	return false
+}
+
+// Lowercase the text and keep only its words, separated by single spaces
+func onlyWords(S string) string {
+	words := strings.FieldsFunc(strings.ToLower(S), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
+	return strings.Join(words, " ")
+}
+
 // Mega story created by Rustam ili Vova ya xz
 func MegaStory(s *discordgo.Session, channel string) {
 
@@ -76,15 +95,6 @@ func MegaStory(s *discordgo.Session, channel string) {
 func GetMD5Hash(text string) string {
 	hash := md5.Sum([]byte(text))
 	return hex.EncodeToString(hash[:])
-}
-
-// Check for times to post anecdotes
-func CheckTimeForAnecdote() bool {
-	switch time.Now().Format(time.Kitchen) {
-	case "11:28PM":
-		return true
-	}
-	return false
 }
 
 // For easier checking

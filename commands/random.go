@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"io"
+	"math"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -69,6 +70,9 @@ func StoryTelling() string {
 	return GetRandomItem(responses)
 }
 
+// Without a timeout, a stuck joke site would make the request wait forever
+var httpClient = &http.Client{Timeout: 10 * time.Second}
+
 // Get a random joke
 func GetRandomAnecdote() string {
 	api_url := "http://anecdotica.ru/api"
@@ -92,18 +96,17 @@ func GetRandomAnecdote() string {
 	// q.Set("censor", "0")
 
 	final_url := api_url + "?" + q.Encode()
-	resp, err := http.Get(final_url)
+	resp, err := httpClient.Get(final_url)
 	if err != nil {
 		fmt.Println("error getting anek", err)
 		return "Не удалось получить анек. Сервис поломался("
-	} else {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return "Не удалось получить анек. Сервис поломался("
-		} else {
-			return string(body)
-		}
 	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "Не удалось получить анек. Сервис поломался("
+	}
+	return string(body)
 }
 
 // Check the input before calling the actual roll function
@@ -111,7 +114,8 @@ func RollInput(msg string) string {
 	message := strings.Split(msg, " ")
 	if len(message) > 1 {
 		num, err := strconv.Atoi(message[1])
-		if err != nil {
+		// negative numbers (and the very biggest one) used to crash the whole bot
+		if err != nil || num < 0 || num == math.MaxInt {
 			return "ептвою мать пиши нормально `ролл 5`, `ролляй 100`, `roll 228` нахуй мне твои буквы"
 		} else {
 			return Roll(num)
@@ -121,12 +125,9 @@ func RollInput(msg string) string {
 	}
 }
 
-// roll a random number between 0 and input
+// roll a random number between 0 and input (including input)
 // returns a string because the other function wants a string returned.
 // It's a question of making the code more compact and readable or more correct
 func Roll(input int) string {
-	min := 0
-	max := input + 1
-	rand.Seed(time.Now().UnixNano())
-	return strconv.Itoa(rand.Intn(max-min) + min)
+	return strconv.Itoa(rand.Intn(input + 1))
 }

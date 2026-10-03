@@ -3,13 +3,11 @@ package commands
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
+	"path"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"github.com/bwmarrin/discordgo"
@@ -32,75 +30,54 @@ func init() {
 
 }
 
-// Note that the item name is converted to lowercase in here
-func downloadFromS3Bucket(item string) (string, error) {
-	downloader := manager.NewDownloader(s3Client)
-	ss := strings.Split(item, "/")
-	fileName := ss[len(ss)-1]
-	file, err := os.Create("tmp/" + fileName)
-	if err != nil {
-		fmt.Println("error creating a file", fileName, err)
-		return "", err
-	}
-	defer file.Close()
-	numBytes, err := downloader.Download(context.TODO(), file,
-		&s3.GetObjectInput{
-			Bucket: aws.String(bucket),
-			Key:    aws.String(strings.ToLower(item)),
-		})
-	if err != nil {
-		fmt.Println("error downloading the file", item, err)
-		return file.Name(), err
-	}
-	fmt.Println("Downloaded", file.Name(), numBytes, "bytes")
-	return file.Name(), nil
-}
-
-func downloadFromS3BucketFolder(folder string) (string, error) {
+// Send a random file from a folder in the bucket
+func SendRandomFileFromFolder(s *discordgo.Session, channel string, folder string) {
 	resp, err := s3Client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucket),
 		Prefix: aws.String(strings.ToLower(folder)),
 	})
 	if err != nil {
-		return "Could not get bucket, pls contact Oleg Ermolaev", err
-	}
-
-	items := resp.Contents
-	item := *GetRandomItem(items).Key
-	return downloadFromS3Bucket(item)
-}
-
-func SendRandomFileFromFolder(s *discordgo.Session, channel string, folder string) {
-
-	//download file from s3 bucket and folder, returns the name of the file
-	fileName, err := downloadFromS3BucketFolder(folder)
-	if err != nil {
 		fmt.Println("Unable to get items from bucket", err)
-		s.ChannelMessageSend(channel, "ойой чета паламалась( Напиши Ендерлолу он там посмотрит че поломалось")
-	} else {
-		sendFile(s, channel, fileName)
+		s.ChannelMessageSend(channel, Something_Broke)
+		return
 	}
+
+	// Skip the empty placeholder objects the S3 console makes for folders (their names end with "/")
+	var items []string
+	for _, object := range resp.Contents {
+		key := aws.ToString(object.Key)
+		if !strings.HasSuffix(key, "/") {
+			items = append(items, key)
+		}
+	}
+	if len(items) == 0 {
+		fmt.Println("No files in bucket folder", folder)
+		s.ChannelMessageSend(channel, Something_Broke)
+		return
+	}
+
+	SendFileFromS3(s, channel, GetRandomItem(items))
 }
 
-func SendFileFromS3(s *discordgo.Session, channel string, item string) {
-	fileName, err := downloadFromS3Bucket(item)
+// Send a file from the bucket straight to Discord, without saving it to disk first.
+// Note that the item name is converted to lowercase in here.
+// Returns the sent message, or nil if something went wrong
+func SendFileFromS3(s *discordgo.Session, channel string, item string) *discordgo.Message {
+	object, err := s3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(strings.ToLower(item)),
+	})
 	if err != nil {
-		fmt.Println("Unable to get an item from bucket", err)
-		s.ChannelMessageSend(channel, "ойой чета паламалась( Напиши Ендерлолу он там посмотрит че поломалось")
-	} else {
-		sendFile(s, channel, fileName)
+		fmt.Println("Unable to get an item from bucket", item, err)
+		s.ChannelMessageSend(channel, Something_Broke)
+		return nil
 	}
-}
+	defer object.Body.Close()
 
-func sendFile(s *discordgo.Session, channel string, fileName string) {
-	//open file to give it to discord
-	file, err := os.Open(fileName)
+	message, err := s.ChannelFileSend(channel, path.Base(item), object.Body)
 	if err != nil {
-		fmt.Println("error opening a file "+file.Name(), err)
-		s.ChannelMessageSend(channel, "ойой чета паламалась( Напиши Ендерлолу он там посмотрит че поломалось")
-	} else {
-		s.ChannelFileSend(channel, filepath.Base(file.Name()), file)
-		//to not leave any leftovers
-		os.Remove(file.Name())
+		fmt.Println("error sending a file", item, err)
+		return nil
 	}
+	return message
 }
